@@ -37,6 +37,8 @@
 /bin/deallocvt
 /sbin/depmod
 /sbin/devmem
+/sbin/devmem2
+/sbin/viewmem
 /bin/df
 /bin/diff
 /bin/dirname
