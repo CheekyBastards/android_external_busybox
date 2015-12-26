@@ -31,22 +31,7 @@ include $(BUILD_STATIC_LIBRARY)
 LOCAL_PATH := $(BB_PATH)
 include $(CLEAR_VARS)
 
-# Explicitly set an architecture specific CONFIG_CROSS_COMPILER_PREFIX
-ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
-    BUSYBOX_CROSS_COMPILER_PREFIX := arm-linux-androideabi-
-endif
-ifneq ($(filter x86 x86_64,$(TARGET_ARCH)),)
-    BUSYBOX_CROSS_COMPILER_PREFIX := $(if $(filter x86_64,$(HOST_ARCH)),x86_64,i686)-linux-android-
-endif
-ifeq ($(TARGET_ARCH),mips)
-    BUSYBOX_CROSS_COMPILER_PREFIX := mipsel-linux-android-
-endif
-
-BB_PREPARE_FLAGS:=
-ifeq ($(HOST_OS),darwin)
-    BB_HOSTCC := $(ANDROID_BUILD_TOP)/prebuilts/gcc/darwin-x86/host/i686-apple-darwin-4.2.1/bin/i686-apple-darwin11-gcc
-    BB_PREPARE_FLAGS := HOSTCC=$(BB_HOSTCC)
-endif
+BUSYBOX_CROSS_COMPILER_PREFIX := $(abspath $(TARGET_TOOLS_PREFIX))
 
 # On aosp (master), path is relative, not on cm (kitkat)
 bb_gen := $(abspath $(TARGET_OUT_INTERMEDIATES)/busybox)
@@ -58,7 +43,7 @@ $(busybox_prepare_full): $(BB_PATH)/busybox-full.config
 	@rm -f $(shell find $(abspath $(call intermediates-dir-for,EXECUTABLES,busybox)) -name "*.o")
 	@mkdir -p $(@D)
 	@cat $^ > $@ && echo "CONFIG_CROSS_COMPILER_PREFIX=\"$(BUSYBOX_CROSS_COMPILER_PREFIX)\"" >> $@
-	+make -C $(BB_PATH) prepare O=$(@D) $(BB_PREPARE_FLAGS)
+	+make -C $(BB_PATH) prepare O=$(@D)
 
 busybox_prepare_minimal := $(bb_gen)/minimal/.config
 $(busybox_prepare_minimal): $(BB_PATH)/busybox-minimal.config
@@ -67,7 +52,7 @@ $(busybox_prepare_minimal): $(BB_PATH)/busybox-minimal.config
 	@rm -f $(shell find $(abspath $(call intermediates-dir-for,STATIC_LIBRARIES,libbusybox)) -name "*.o")
 	@mkdir -p $(@D)
 	@cat $^ > $@ && echo "CONFIG_CROSS_COMPILER_PREFIX=\"$(BUSYBOX_CROSS_COMPILER_PREFIX)\"" >> $@
-	+make -C $(BB_PATH) prepare O=$(@D) $(BB_PREPARE_FLAGS)
+	+make -C $(BB_PATH) prepare O=$(@D)
 
 
 #####################################################################
@@ -103,7 +88,7 @@ BUSYBOX_C_INCLUDES = \
 	bionic/libm \
 	libc/kernel/common \
 	external/libselinux/include \
-	external/libsepol/include \
+	external/selinux/libsepol/include \
 	$(BB_PATH)/android/regex \
 	$(BB_PATH)/android/librpc
 
@@ -169,7 +154,10 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
 LOCAL_SHARED_LIBRARIES := libc libcutils libm
 LOCAL_STATIC_LIBRARIES := libclearsilverregex libuclibcrpc libselinux
 LOCAL_ADDITIONAL_DEPENDENCIES := $(busybox_prepare_full)
+LOCAL_CLANG := false
 include $(BUILD_EXECUTABLE)
+
+ifeq ($(WITH_BUSYBOX_LINKS),true)
 
 BUSYBOX_LINKS := $(shell cat $(BB_PATH)/busybox-$(BUSYBOX_CONFIG).links)
 # nc is provided by external/netcat
@@ -189,6 +177,7 @@ ALL_DEFAULT_INSTALLED_MODULES += $(SYMLINKS)
 ALL_MODULES.$(LOCAL_MODULE).INSTALLED := \
     $(ALL_MODULES.$(LOCAL_MODULE).INSTALLED) $(SYMLINKS)
 
+endif
 
 # Static Busybox
 
@@ -217,4 +206,6 @@ LOCAL_MODULE_CLASS := UTILITY_EXECUTABLES
 LOCAL_MODULE_PATH := $(PRODUCT_OUT)/utilities
 LOCAL_UNSTRIPPED_PATH := $(PRODUCT_OUT)/symbols/utilities
 LOCAL_ADDITIONAL_DEPENDENCIES := $(busybox_prepare_full)
+LOCAL_PACK_MODULE_RELOCATIONS := false
+LOCAL_CLANG := false
 include $(BUILD_EXECUTABLE)
